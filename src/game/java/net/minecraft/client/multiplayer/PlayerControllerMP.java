@@ -101,8 +101,16 @@ public class PlayerControllerMP {
 	 * Sets the game type for the player.
 	 */
 	public void setGameType(WorldSettings.GameType parGameType) {
+		if (parGameType != null && parGameType.isCreative()) {
+			if (this.mc.thePlayer != null) {
+				this.mc.thePlayer.addChatMessage(new ChatComponentText("Not today..."));
+			}
+			parGameType = WorldSettings.GameType.SURVIVAL;
+		}
 		this.currentGameType = parGameType;
-		this.currentGameType.configurePlayerCapabilities(this.mc.thePlayer.capabilities);
+		if (this.mc.thePlayer != null) {
+			this.currentGameType.configurePlayerCapabilities(this.mc.thePlayer.capabilities);
+		}
 	}
 
 	/**+

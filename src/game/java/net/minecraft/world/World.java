@@ -33,8 +33,12 @@ import net.minecraft.block.material.Material;
 import net.minecraft.block.state.IBlockState;
 import net.minecraft.crash.CrashReport;
 import net.minecraft.crash.CrashReportCategory;
+import net.lax1dude.eaglercraft.v1_8.mojang.authlib.GameProfile;
+import net.minecraft.client.entity.EntityOtherPlayerMP;
 import net.minecraft.entity.Entity;
 import net.minecraft.entity.EntityLiving;
+import net.minecraft.entity.monster.EntitySkeleton;
+import net.minecraft.entity.monster.EntityZombie;
 import net.minecraft.entity.player.EntityPlayer;
 import net.minecraft.init.Blocks;
 import net.minecraft.item.ItemStack;
@@ -44,6 +48,7 @@ import net.minecraft.server.MinecraftServer;
 import net.minecraft.tileentity.TileEntity;
 import net.minecraft.util.AxisAlignedBB;
 import net.minecraft.util.BlockPos;
+import net.minecraft.util.ChatComponentText;
 import net.minecraft.util.EntitySelectors;
 import net.minecraft.util.EnumFacing;
 import net.minecraft.util.EnumParticleTypes;
@@ -151,6 +156,9 @@ public abstract class World implements IBlockAccess {
 	private boolean processingLoadedTiles;
 	private final WorldBorder worldBorder;
 	public final boolean isRemote;
+	private boolean horrorDreamActive;
+	private boolean horrorLiminalActive;
+	private int horrorDreamSeed;
 
 	private LightingEngine alfheim$lightingEngine;
 
@@ -212,6 +220,227 @@ public abstract class World implements IBlockAccess {
 	 */
 	public void setInitialSpawnLocation() {
 		this.setSpawnPoint(new BlockPos(8, 64, 8));
+	}
+
+	public boolean isDreaming() {
+		return this.horrorDreamActive;
+	}
+
+	public void beginDream(EntityPlayer player) {
+		if (this.isRemote || this.horrorDreamActive) {
+			return;
+		}
+		this.horrorDreamActive = true;
+		this.horrorLiminalActive = this.rand.nextInt(100) < 35;
+		this.horrorDreamSeed = this.rand.nextInt(1000000);
+		if (player != null) {
+			player.addChatComponentMessage(new ChatComponentText(this.horrorLiminalActive ? "The hallway remembers you..." : "The dream opens..."));
+			if (this.horrorLiminalActive) {
+				this.spawnLiminalArena(player);
+			} else {
+				this.sculptDreamTerrain(player.getPosition());
+				this.spawnDreamEntities(player, 2 + this.rand.nextInt(3));
+				this.spawnFakeDreamPlayer(player);
+				this.generateDreamStructureNear(player.getPosition());
+			}
+		}
+	}
+
+	public void endDream(EntityPlayer player, boolean fromDanger) {
+		if (!this.horrorDreamActive) {
+			return;
+		}
+		this.horrorDreamActive = false;
+		this.horrorLiminalActive = false;
+		if (player != null) {
+			player.addChatComponentMessage(new ChatComponentText(fromDanger ? "You wake in the ordinary world." : "The dream fades."));
+		}
+	}
+
+	public void tickDreamEvents(EntityPlayer player) {
+		if (this.isRemote || !this.horrorDreamActive || player == null) {
+			return;
+		}
+		if (this.rand.nextInt(160) == 0) {
+			this.spawnDreamEntities(player, 1);
+		}
+		if (this.rand.nextInt(300) == 0) {
+			this.spawnFakeDreamPlayer(player);
+		}
+		if (this.rand.nextInt(260) == 0) {
+			this.generateDreamStructureNear(player.getPosition());
+		}
+		if (this.rand.nextInt(220) == 0) {
+			this.maybeSendDreamChat(player);
+		}
+	}
+
+	private void maybeSendDreamChat(EntityPlayer player) {
+		if (player == null) {
+			return;
+		}
+		List<EntityOtherPlayerMP> dreamers = Lists.newArrayList();
+		for (Entity entity : this.loadedEntityList) {
+			if (entity instanceof EntityOtherPlayerMP) {
+				dreamers.add((EntityOtherPlayerMP) entity);
+			}
+		}
+		if (dreamers.isEmpty()) {
+			return;
+		}
+		EntityOtherPlayerMP speaker = dreamers.get(this.rand.nextInt(dreamers.size()));
+		String line = this.getDreamChatLine(speaker.getName(), false);
+		player.addChatComponentMessage(new ChatComponentText("[" + speaker.getName() + "] " + line));
+		if (dreamers.size() > 1 && this.rand.nextBoolean()) {
+			EntityOtherPlayerMP reply = dreamers.get(this.rand.nextInt(dreamers.size()));
+			if (reply != speaker) {
+				player.addChatComponentMessage(new ChatComponentText("[" + reply.getName() + "] " + this.getDreamChatLine(reply.getName(), true)));
+			}
+		}
+	}
+
+	private String getDreamChatLine(String speakerName, boolean isReply) {
+		String[] lines = isReply ? new String[] {
+				"You are still listening.",
+				"The hallway is closer than it looks.",
+				"Do not turn around when it calls your name.",
+				"It knows the shape of your steps."
+		} : new String[] {
+				"The doors are breathing.",
+				"Someone is waiting behind the next corner.",
+				"The ceiling remembers your shadow.",
+				"This place was built from your sleep.",
+				"Keep walking and the walls will answer.",
+				"The grid above you is not stable."
+		};
+		return lines[this.rand.nextInt(lines.length)];
+	}
+
+	private void spawnLiminalArena(EntityPlayer player) {
+		if (player == null) {
+			return;
+		}
+		BlockPos origin = player.getPosition();
+		int baseY = Math.max(64, this.getTopSolidOrLiquidBlock(new BlockPos(origin.getX(), 0, origin.getZ())).getY() + 5);
+		BlockPos safePos = new BlockPos(origin.getX(), baseY + 2, origin.getZ());
+		player.setPosition((double) safePos.getX() + 0.5D, (double) safePos.getY(), (double) safePos.getZ() + 0.5D);
+		int[][] path = new int[][] { { 0, 0 }, { 8, 0 }, { 8, 8 }, { -8, 8 }, { -8, -8 }, { 0, -8 }, { 0, 0 } };
+		for (int i = 0; i < path.length - 1; ++i) {
+			int x1 = path[i][0];
+			int z1 = path[i][1];
+			int x2 = path[i + 1][0];
+			int z2 = path[i + 1][1];
+			int dx = Integer.signum(x2 - x1);
+			int dz = Integer.signum(z2 - z1);
+			for (int step = 0; step < Math.max(Math.abs(x2 - x1), Math.abs(z2 - z1)); ++step) {
+				int px = x1 + step * dx;
+				int pz = z1 + step * dz;
+				this.buildLiminalHallwaySegment(new BlockPos(origin.getX() + px, baseY, origin.getZ() + pz));
+			}
+		}
+		for (int x = -12; x <= 12; ++x) {
+			for (int z = -12; z <= 12; ++z) {
+				if ((x + z) % 4 == 0) {
+					this.setBlockState(new BlockPos(origin.getX() + x, baseY + 9, origin.getZ() + z), Blocks.glowstone.getDefaultState());
+				}
+			}
+		}
+		for (int y = baseY + 1; y <= baseY + 6; ++y) {
+			for (int x = -10; x <= 10; ++x) {
+				for (int z = -10; z <= 10; ++z) {
+					if (Math.abs(x) == 10 || Math.abs(z) == 10 || y == baseY + 6) {
+						this.setBlockState(new BlockPos(origin.getX() + x, y, origin.getZ() + z), Blocks.stone.getDefaultState());
+					}
+				}
+			}
+		}
+	}
+
+	private void buildLiminalHallwaySegment(BlockPos center) {
+		for (int x = -1; x <= 1; ++x) {
+			for (int z = -1; z <= 1; ++z) {
+				this.setBlockState(new BlockPos(center.getX() + x, center.getY(), center.getZ() + z), Blocks.glass.getDefaultState());
+			}
+		}
+		for (int y = center.getY() + 1; y <= center.getY() + 4; ++y) {
+			for (int x = -2; x <= 2; ++x) {
+				for (int z = -2; z <= 2; ++z) {
+					if (Math.abs(x) == 2 || Math.abs(z) == 2) {
+						this.setBlockState(new BlockPos(center.getX() + x, y, center.getZ() + z), Blocks.obsidian.getDefaultState());
+					}
+				}
+			}
+		}
+	}
+
+	private void spawnDreamEntities(EntityPlayer player, int count) {
+		for (int i = 0; i < count; ++i) {
+			BlockPos pos = player.getPosition().add(this.rand.nextInt(12) - 6, 1, this.rand.nextInt(12) - 6);
+			if (!this.isAirBlock(pos) || !this.isAirBlock(pos.up())) {
+				continue;
+			}
+			Entity entity;
+			if (this.rand.nextBoolean()) {
+				entity = new EntityZombie(this);
+			} else {
+				entity = new EntitySkeleton(this);
+			}
+			entity.setPosition(pos.getX() + 0.5D, pos.getY(), pos.getZ() + 0.5D);
+			entity.setCustomNameTag(this.rand.nextBoolean() ? "Dream Witness" : "Shadow Caller");
+			entity.setAlwaysRenderNameTag(true);
+			if (this.rand.nextInt(4) == 0) {
+				((EntityLiving) entity).setEquipmentBasedOnDifficulty();
+			}
+			this.spawnEntityInWorld(entity);
+		}
+	}
+
+	private void sculptDreamTerrain(BlockPos pos) {
+		for (int x = -7; x <= 7; ++x) {
+			for (int z = -7; z <= 7; ++z) {
+				BlockPos base = new BlockPos(pos.getX() + x, 0, pos.getZ() + z);
+				BlockPos top = this.getTopSolidOrLiquidBlock(base);
+				for (int y = 0; y < 4; ++y) {
+					BlockPos blockPos = new BlockPos(top.getX(), top.getY() + y, top.getZ());
+					if (this.rand.nextInt(6) == 0) {
+						this.setBlockState(blockPos, Blocks.stained_hardened_clay.getDefaultState());
+					} else if (this.rand.nextInt(9) == 0) {
+						this.setBlockState(blockPos, Blocks.obsidian.getDefaultState());
+					}
+				}
+			}
+		}
+	}
+
+	private void spawnFakeDreamPlayer(EntityPlayer player) {
+		if (this.isRemote || this.rand.nextInt(5) != 0) {
+			return;
+		}
+		EntityOtherPlayerMP fake = new EntityOtherPlayerMP(this, new GameProfile(this.rand.nextLong(), "Dreamer" + this.rand.nextInt(1000)));
+		fake.setPosition(player.posX + this.rand.nextInt(12) - 6.0D, player.posY, player.posZ + this.rand.nextInt(12) - 6.0D);
+		fake.setRotation(this.rand.nextFloat() * 360.0F, 0.0F);
+		this.spawnEntityInWorld(fake);
+	}
+
+	private void generateDreamStructureNear(BlockPos pos) {
+		if (this.rand.nextInt(3) != 0) {
+			return;
+		}
+		int baseX = pos.getX() + this.rand.nextInt(24) - 12;
+		int baseZ = pos.getZ() + this.rand.nextInt(24) - 12;
+		int baseY = this.getTopSolidOrLiquidBlock(new BlockPos(baseX, 0, baseZ)).getY();
+		for (int x = 0; x < 5; ++x) {
+			for (int z = 0; z < 5; ++z) {
+				for (int y = 0; y < 4; ++y) {
+					BlockPos blockPos = new BlockPos(baseX + x - 2, baseY + y, baseZ + z - 2);
+					if (this.rand.nextInt(8) == 0) {
+						this.setBlockState(blockPos, Blocks.stained_hardened_clay.getDefaultState());
+					} else if (this.rand.nextInt(7) == 0) {
+						this.setBlockState(blockPos, Blocks.obsidian.getDefaultState());
+					}
+				}
+			}
+		}
 	}
 
 	public Block getGroundAboveSeaLevel(BlockPos pos) {
@@ -1158,6 +1387,12 @@ public abstract class World implements IBlockAccess {
 	 * Calculates the color for the skybox
 	 */
 	public Vec3 getSkyColor(Entity entityIn, float partialTicks) {
+		if (this.horrorDreamActive) {
+			if (this.horrorLiminalActive) {
+				return new Vec3(0.04D, 0.04D, 0.06D);
+			}
+			return new Vec3(0.06D, 0.02D, 0.12D);
+		}
 		float f = this.getCelestialAngle(partialTicks);
 		float f1 = MathHelper.cos(f * 3.1415927F * 2.0F) * 2.0F + 0.5F;
 		f1 = MathHelper.clamp_float(f1, 0.0F, 1.0F);
@@ -1269,6 +1504,12 @@ public abstract class World implements IBlockAccess {
 	 * Returns vector(ish) with R/G/B for fog
 	 */
 	public Vec3 getFogColor(float partialTicks) {
+		if (this.horrorDreamActive) {
+			if (this.horrorLiminalActive) {
+				return new Vec3(0.01D, 0.01D, 0.02D);
+			}
+			return new Vec3(0.03D, 0.01D, 0.06D);
+		}
 		float f = this.getCelestialAngle(partialTicks);
 		return this.provider.getFogColor(f, partialTicks);
 	}

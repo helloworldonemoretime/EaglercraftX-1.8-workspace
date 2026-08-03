@@ -1857,7 +1857,10 @@ public class EntityRenderer implements IResourceManagerReloadListener {
 			GlStateManager.setFogDensity(0.001F);
 			float f = this.farPlaneDistance;
 			GlStateManager.setFog(GL_LINEAR);
-			if (partialTicks == -1) {
+			if (this.mc.theWorld != null && this.mc.theWorld instanceof World && ((World) this.mc.theWorld).isDreaming()) {
+				GlStateManager.setFogStart(0.0F);
+				GlStateManager.setFogEnd(Math.max(8.0F, f * 0.12F));
+			} else if (partialTicks == -1) {
 				GlStateManager.setFogStart(0.0F);
 				GlStateManager.setFogEnd(f);
 			} else {

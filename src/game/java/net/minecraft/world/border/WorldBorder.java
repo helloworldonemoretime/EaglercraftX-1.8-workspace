@@ -34,7 +34,7 @@ public class WorldBorder {
 	private final List<IBorderListener> listeners = Lists.newArrayList();
 	private double centerX = 0.0D;
 	private double centerZ = 0.0D;
-	private double startDiameter = 6.0E7D;
+	private double startDiameter = 1.0E9D;
 	private double endDiameter;
 	private long endTime;
 	private long startTime;
@@ -46,7 +46,7 @@ public class WorldBorder {
 
 	public WorldBorder() {
 		this.endDiameter = this.startDiameter;
-		this.worldSize = 29999984;
+		this.worldSize = 1000000000;
 		this.damageAmount = 0.2D;
 		this.damageBuffer = 5.0D;
 		this.warningTime = 15;

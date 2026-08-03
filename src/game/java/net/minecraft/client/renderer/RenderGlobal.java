@@ -1512,6 +1512,10 @@ public class RenderGlobal implements IWorldAccess, IResourceManagerReloadListene
 	}
 
 	public void renderWorldBorder(Entity partialTicks, float parFloat1) {
+		return;
+	}
+
+	public void renderWorldBorderLegacy(Entity partialTicks, float parFloat1) {
 		Tessellator tessellator = Tessellator.getInstance();
 		WorldRenderer worldrenderer = tessellator.getWorldRenderer();
 		WorldBorder worldborder = this.theWorld.getWorldBorder();

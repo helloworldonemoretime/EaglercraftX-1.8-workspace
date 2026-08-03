@@ -78,6 +78,7 @@ public class GuiMainMenu extends GuiScreen implements GuiYesNoCallback {
 	private static final byte[] sha1def = new byte[] { -107, 77, 108, 49, 11, -100, -8, -119, -1, -100, -85, -55, 18,
 			-69, -107, 113, -93, -101, -79, 32 };
 	private String splashText;
+	private String horrorSubtitle = "Not today...";
 	private GuiButton buttonResetDemo;
 	private int panoramaTimer;
 	/**+
@@ -316,8 +317,10 @@ public class GuiMainMenu extends GuiScreen implements GuiYesNoCallback {
 	private void addSingleplayerMultiplayerButtons(int parInt1, int parInt2) {
 		this.buttonList
 				.add(new GuiButton(1, this.width / 2 - 100, parInt1, I18n.format("menu.singleplayer", new Object[0])));
-		this.buttonList.add(new GuiButton(2, this.width / 2 - 100, parInt1 + parInt2 * 1,
-				I18n.format("menu.multiplayer", new Object[0])));
+		GuiButton multiplayerButton = new GuiButton(2, this.width / 2 - 100, parInt1 + parInt2 * 1,
+				I18n.format("menu.multiplayer", new Object[0]));
+		multiplayerButton.enabled = false;
+		this.buttonList.add(multiplayerButton);
 		if (EaglercraftVersion.mainMenuEnableGithubButton) {
 			this.buttonList.add(
 					new GuiButton(14, this.width / 2 - 100, parInt1 + parInt2 * 2, I18n.format("menu.forkOnGitlab")));
@@ -363,7 +366,7 @@ public class GuiMainMenu extends GuiScreen implements GuiYesNoCallback {
 		}
 
 		if (parGuiButton.id == 2) {
-			this.mc.displayGuiScreen(new GuiMultiplayer(this));
+			this.mc.displayGuiScreen(new GuiMainMenu());
 		}
 
 		if (parGuiButton.id == 4) {
@@ -652,6 +655,7 @@ public class GuiMainMenu extends GuiScreen implements GuiYesNoCallback {
 		}
 		GlStateManager.scale(f1, f1, f1);
 		this.drawCenteredString(this.fontRendererObj, this.splashText, 0, -8, -256);
+		this.drawCenteredString(this.fontRendererObj, this.horrorSubtitle, 0, 18, 0xFF6666);
 		GlStateManager.popMatrix();
 
 		String s = EaglercraftVersion.mainMenuStringA;

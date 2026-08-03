@@ -237,6 +237,9 @@ public abstract class EntityPlayer extends EntityLivingBase implements ICommandS
 	 */
 	public void onUpdate() {
 		this.noClip = this.isSpectator();
+		if (!this.worldObj.isRemote && this.isPlayerSleeping() && this.worldObj instanceof World) {
+			((World) this.worldObj).tickDreamEvents(this);
+		}
 		if (this.isSpectator()) {
 			this.onGround = false;
 		}
@@ -599,6 +602,9 @@ public abstract class EntityPlayer extends EntityLivingBase implements ICommandS
 	 */
 	public void onDeath(DamageSource damagesource) {
 		super.onDeath(damagesource);
+		if (!this.worldObj.isRemote && this.worldObj instanceof World && ((World) this.worldObj).isDreaming()) {
+			((World) this.worldObj).endDream(this, true);
+		}
 		this.setSize(0.2F, 0.2F);
 		this.setPosition(this.posX, this.posY, this.posZ);
 		this.motionY = 0.10000000149011612D;
@@ -1258,6 +1264,9 @@ public abstract class EntityPlayer extends EntityLivingBase implements ICommandS
 
 	public EntityPlayer.EnumStatus trySleep(BlockPos blockpos) {
 		if (!this.worldObj.isRemote) {
+			if (this.worldObj instanceof World && ((World) this.worldObj).isDreaming()) {
+				((World) this.worldObj).endDream(this, false);
+			}
 			if (this.isPlayerSleeping() || !this.isEntityAlive()) {
 				return EntityPlayer.EnumStatus.OTHER_PROBLEM;
 			}
@@ -1321,6 +1330,9 @@ public abstract class EntityPlayer extends EntityLivingBase implements ICommandS
 
 		this.sleeping = true;
 		this.sleepTimer = 0;
+		if (!this.worldObj.isRemote && this.worldObj instanceof World) {
+			((World) this.worldObj).beginDream(this);
+		}
 		this.playerLocation = blockpos;
 		this.motionX = this.motionZ = this.motionY = 0.0D;
 		if (!this.worldObj.isRemote) {
@@ -1353,6 +1365,7 @@ public abstract class EntityPlayer extends EntityLivingBase implements ICommandS
 	 * Wake up the player if they're sleeping.
 	 */
 	public void wakeUpPlayer(boolean flag, boolean flag1, boolean flag2) {
+		boolean wasDreaming = this.sleeping && this.worldObj instanceof World && ((World) this.worldObj).isDreaming();
 		this.setSize(0.6F, 1.8F);
 		IBlockState iblockstate = this.worldObj.getBlockState(this.playerLocation);
 		if (this.playerLocation != null && iblockstate.getBlock() == Blocks.bed) {
@@ -1375,6 +1388,9 @@ public abstract class EntityPlayer extends EntityLivingBase implements ICommandS
 		this.sleepTimer = flag ? 0 : 100;
 		if (flag2) {
 			this.setSpawnPoint(this.playerLocation, false);
+		}
+		if (!this.worldObj.isRemote && this.worldObj instanceof World && wasDreaming) {
+			((World) this.worldObj).endDream(this, true);
 		}
 
 	}
