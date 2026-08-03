@@ -389,7 +389,7 @@ public abstract class World implements IBlockAccess {
 			entity.setCustomNameTag(this.rand.nextBoolean() ? "Dream Witness" : "Shadow Caller");
 			entity.setAlwaysRenderNameTag(true);
 			if (this.rand.nextInt(4) == 0) {
-				((EntityLiving) entity).setEquipmentBasedOnDifficulty();
+				((EntityLiving) entity).setEquipmentBasedOnDifficulty(new DifficultyInstance(this.getDifficulty(), this.getWorldTime(), 0L, 0.0F));
 			}
 			this.spawnEntityInWorld(entity);
 		}
@@ -416,9 +416,11 @@ public abstract class World implements IBlockAccess {
 		if (this.isRemote || this.rand.nextInt(5) != 0) {
 			return;
 		}
-		EntityOtherPlayerMP fake = new EntityOtherPlayerMP(this, new GameProfile(this.rand.nextLong(), "Dreamer" + this.rand.nextInt(1000)));
+		EntityOtherPlayerMP fake = new EntityOtherPlayerMP(this,
+				new GameProfile(new EaglercraftUUID(this.rand.nextLong(), this.rand.nextLong()),
+						"Dreamer" + this.rand.nextInt(1000)));
 		fake.setPosition(player.posX + this.rand.nextInt(12) - 6.0D, player.posY, player.posZ + this.rand.nextInt(12) - 6.0D);
-		fake.setRotation(this.rand.nextFloat() * 360.0F, 0.0F);
+		fake.setPositionAndRotation(fake.posX, fake.posY, fake.posZ, this.rand.nextFloat() * 360.0F, 0.0F);
 		this.spawnEntityInWorld(fake);
 	}
 
