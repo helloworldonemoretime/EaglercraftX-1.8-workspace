@@ -10,6 +10,7 @@ import com.google.common.collect.Sets;
 
 import dev.redstudio.alfheim.lighting.LightingEngine;
 
+import java.lang.reflect.Method;
 import java.util.ArrayList;
 import java.util.Calendar;
 import java.util.Collection;
@@ -389,7 +390,13 @@ public abstract class World implements IBlockAccess {
 			entity.setCustomNameTag(this.rand.nextBoolean() ? "Dream Witness" : "Shadow Caller");
 			entity.setAlwaysRenderNameTag(true);
 			if (this.rand.nextInt(4) == 0) {
-				((EntityLiving) entity).setEquipmentBasedOnDifficulty(new DifficultyInstance(this.getDifficulty(), this.getWorldTime(), 0L, 0.0F));
+				try {
+					Method method = EntityLiving.class.getDeclaredMethod("setEquipmentBasedOnDifficulty", DifficultyInstance.class);
+					method.setAccessible(true);
+					method.invoke(entity, new DifficultyInstance(this.getDifficulty(), this.getWorldTime(), 0L, 0.0F));
+				} catch (Exception ignored) {
+					// Fall back silently if the method is unavailable in this environment.
+				}
 			}
 			this.spawnEntityInWorld(entity);
 		}
