@@ -229,7 +229,7 @@ public abstract class World implements IBlockAccess {
 	}
 
 	public void beginDream(EntityPlayer player) {
-		if (this.isRemote || this.horrorDreamActive) {
+		if (this.horrorDreamActive) {
 			return;
 		}
 		this.horrorDreamActive = true;
@@ -266,7 +266,7 @@ public abstract class World implements IBlockAccess {
 	}
 
 	public void tickDreamEvents(EntityPlayer player) {
-		if (this.isRemote || !this.horrorDreamActive || player == null) {
+		if (!this.horrorDreamActive || player == null) {
 			return;
 		}
 		if (this.rand.nextInt(180) == 0) {
@@ -420,7 +420,7 @@ public abstract class World implements IBlockAccess {
 	}
 
 	private void spawnFakeDreamPlayer(EntityPlayer player) {
-		if (this.isRemote || this.rand.nextInt(5) != 0) {
+		if (this.rand.nextInt(5) != 0) {
 			return;
 		}
 		EntityOtherPlayerMP fake = new EntityOtherPlayerMP(this, player.getGameProfile());

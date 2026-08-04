@@ -54,15 +54,13 @@ public class NoiseGeneratorOctaves extends NoiseGenerator {
 		double d3 = 1.0D;
 
 		for (int j = 0; j < this.octaves; ++j) {
-			double d0 = (double) parInt1 * d3 * parDouble1;
+			double d0 = ((double) parInt1 + 12550816.0D) * d3 * parDouble1;
 			double d1 = (double) parInt2 * d3 * parDouble2;
-			double d2 = (double) parInt3 * d3 * parDouble3;
+			double d2 = ((double) parInt3 + 12550816.0D) * d3 * parDouble3;
 			long k = MathHelper.floor_double_long(d0);
 			long l = MathHelper.floor_double_long(d2);
 			d0 = d0 - (double) k;
 			d2 = d2 - (double) l;
-			k = k % 16777216L;
-			l = l % 16777216L;
 			d0 = d0 + (double) k;
 			d2 = d2 + (double) l;
 			this.generatorCollection[j].populateNoiseArray(parArrayOfDouble, d0, d1, d2, parInt4, parInt5, parInt6,
