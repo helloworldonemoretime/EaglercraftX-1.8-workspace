@@ -160,6 +160,7 @@ public abstract class World implements IBlockAccess {
 	private boolean horrorDreamActive;
 	private boolean horrorLiminalActive;
 	private int horrorDreamSeed;
+	private final Set<Integer> dreamEntityIds = Sets.newHashSet();
 
 	private LightingEngine alfheim$lightingEngine;
 
@@ -234,15 +235,20 @@ public abstract class World implements IBlockAccess {
 		this.horrorDreamActive = true;
 		this.horrorLiminalActive = this.rand.nextInt(100) < 35;
 		this.horrorDreamSeed = this.rand.nextInt(1000000);
+		this.dreamEntityIds.clear();
 		if (player != null) {
 			player.addChatComponentMessage(new ChatComponentText(this.horrorLiminalActive ? "The hallway remembers you..." : "The dream opens..."));
+			if (this.rand.nextInt(100) < 25) {
+				this.teleportToFarlands(player);
+			}
 			if (this.horrorLiminalActive) {
 				this.spawnLiminalArena(player);
 			} else {
-				this.sculptDreamTerrain(player.getPosition());
-				this.spawnDreamEntities(player, 2 + this.rand.nextInt(3));
+				this.rewriteDreamVicinity(player);
+				this.spawnDreamEntities(player, 3 + this.rand.nextInt(3));
 				this.spawnFakeDreamPlayer(player);
-				this.generateDreamStructureNear(player.getPosition());
+				this.spawnEmptyDreamVillage(player);
+				this.sendDreamLoreMessage(player, "<Mara> the place is keeping your footsteps.");
 			}
 		}
 	}
@@ -253,6 +259,7 @@ public abstract class World implements IBlockAccess {
 		}
 		this.horrorDreamActive = false;
 		this.horrorLiminalActive = false;
+		this.dreamEntityIds.clear();
 		if (player != null) {
 			player.addChatComponentMessage(new ChatComponentText(fromDanger ? "You wake in the ordinary world." : "The dream fades."));
 		}
@@ -262,59 +269,63 @@ public abstract class World implements IBlockAccess {
 		if (this.isRemote || !this.horrorDreamActive || player == null) {
 			return;
 		}
-		if (this.rand.nextInt(160) == 0) {
+		if (this.rand.nextInt(180) == 0) {
 			this.spawnDreamEntities(player, 1);
 		}
-		if (this.rand.nextInt(300) == 0) {
+		if (this.rand.nextInt(320) == 0) {
 			this.spawnFakeDreamPlayer(player);
 		}
-		if (this.rand.nextInt(260) == 0) {
-			this.generateDreamStructureNear(player.getPosition());
-		}
 		if (this.rand.nextInt(220) == 0) {
+			this.rewriteDreamVicinity(player);
+		}
+		if (this.rand.nextInt(150) == 0) {
 			this.maybeSendDreamChat(player);
 		}
+		this.updateDreamEntityBehavior(player);
 	}
 
 	private void maybeSendDreamChat(EntityPlayer player) {
 		if (player == null) {
 			return;
 		}
-		List<EntityOtherPlayerMP> dreamers = Lists.newArrayList();
-		for (Entity entity : this.loadedEntityList) {
-			if (entity instanceof EntityOtherPlayerMP) {
-				dreamers.add((EntityOtherPlayerMP) entity);
-			}
-		}
-		if (dreamers.isEmpty()) {
-			return;
-		}
-		EntityOtherPlayerMP speaker = dreamers.get(this.rand.nextInt(dreamers.size()));
-		String line = this.getDreamChatLine(speaker.getName(), false);
-		player.addChatComponentMessage(new ChatComponentText("[" + speaker.getName() + "] " + line));
-		if (dreamers.size() > 1 && this.rand.nextBoolean()) {
-			EntityOtherPlayerMP reply = dreamers.get(this.rand.nextInt(dreamers.size()));
-			if (reply != speaker) {
-				player.addChatComponentMessage(new ChatComponentText("[" + reply.getName() + "] " + this.getDreamChatLine(reply.getName(), true)));
-			}
+		String[][] conversations = new String[][] {
+				{ "<Mara>", "did you bring the key?" },
+				{ "<Rook>", "the hallway keeps changing when you blink." },
+				{ "<Nico>", "I saw your room in the glass again." },
+				{ "<Lena>", "don't answer if it says your name." },
+				{ "<Jules>", "the village is empty but the doors still open." },
+				{ "<Sera>", "we left the lanterns on for you." }
+		};
+		int first = this.rand.nextInt(conversations.length);
+		int second = (first + 1 + this.rand.nextInt(conversations.length - 1)) % conversations.length;
+		player.addChatComponentMessage(new ChatComponentText("\u00a7e" + conversations[first][0] + " " + conversations[first][1]));
+		if (this.rand.nextBoolean()) {
+			player.addChatComponentMessage(new ChatComponentText("\u00a7e" + conversations[second][0] + " " + conversations[second][1]));
 		}
 	}
 
-	private String getDreamChatLine(String speakerName, boolean isReply) {
-		String[] lines = isReply ? new String[] {
-				"You are still listening.",
-				"The hallway is closer than it looks.",
-				"Do not turn around when it calls your name.",
-				"It knows the shape of your steps."
-		} : new String[] {
-				"The doors are breathing.",
-				"Someone is waiting behind the next corner.",
-				"The ceiling remembers your shadow.",
-				"This place was built from your sleep.",
-				"Keep walking and the walls will answer.",
-				"The grid above you is not stable."
-		};
-		return lines[this.rand.nextInt(lines.length)];
+	private void sendDreamLoreMessage(EntityPlayer player, String line) {
+		if (player != null) {
+			player.addChatComponentMessage(new ChatComponentText("\u00a7e" + line));
+		}
+	}
+
+	private void updateDreamEntityBehavior(EntityPlayer player) {
+		if (player == null) {
+			return;
+		}
+		for (Entity entity : this.loadedEntityList) {
+			if (!(entity instanceof EntityOtherPlayerMP) || !this.dreamEntityIds.contains(entity.getEntityId())) {
+				continue;
+			}
+			double dx = player.posX - entity.posX;
+			double dz = player.posZ - entity.posZ;
+			double distance = Math.max(0.1D, Math.sqrt(dx * dx + dz * dz));
+			entity.setVelocity(dx / distance * 0.06D, entity.motionY * 0.05D, dz / distance * 0.06D);
+			entity.moveEntity(entity.motionX, entity.motionY, entity.motionZ);
+			entity.rotationYaw = (float) (Math.toDegrees(Math.atan2(dz, dx)) - 90.0F);
+			entity.rotationPitch = 0.0F;
+		}
 	}
 
 	private void spawnLiminalArena(EntityPlayer player) {
@@ -380,25 +391,14 @@ public abstract class World implements IBlockAccess {
 			if (!this.isAirBlock(pos) || !this.isAirBlock(pos.up())) {
 				continue;
 			}
-			Entity entity;
-			if (this.rand.nextBoolean()) {
-				entity = new EntityZombie(this);
-			} else {
-				entity = new EntitySkeleton(this);
-			}
-			entity.setPosition(pos.getX() + 0.5D, pos.getY(), pos.getZ() + 0.5D);
-			entity.setCustomNameTag(this.rand.nextBoolean() ? "Dream Witness" : "Shadow Caller");
-			entity.setAlwaysRenderNameTag(true);
-			if (this.rand.nextInt(4) == 0) {
-				try {
-					Method method = EntityLiving.class.getDeclaredMethod("setEquipmentBasedOnDifficulty", DifficultyInstance.class);
-					method.setAccessible(true);
-					method.invoke(entity, new DifficultyInstance(this.getDifficulty(), this.getWorldTime(), 0L, 0.0F));
-				} catch (Exception ignored) {
-					// Fall back silently if the method is unavailable in this environment.
-				}
-			}
-			this.spawnEntityInWorld(entity);
+			EntityOtherPlayerMP dreamer = new EntityOtherPlayerMP(this, player.getGameProfile());
+			dreamer.setPosition(pos.getX() + 0.5D, pos.getY(), pos.getZ() + 0.5D);
+			dreamer.setCustomNameTag(this.rand.nextBoolean() ? "Dream Witness" : "Shadow Caller");
+			dreamer.setAlwaysRenderNameTag(true);
+			dreamer.setHealth(20.0F);
+			dreamer.setNoAI(false);
+			this.spawnEntityInWorld(dreamer);
+			this.dreamEntityIds.add(dreamer.getEntityId());
 		}
 	}
 
@@ -423,33 +423,72 @@ public abstract class World implements IBlockAccess {
 		if (this.isRemote || this.rand.nextInt(5) != 0) {
 			return;
 		}
-		EntityOtherPlayerMP fake = new EntityOtherPlayerMP(this,
-				new GameProfile(new EaglercraftUUID(this.rand.nextLong(), this.rand.nextLong()),
-						"Dreamer" + this.rand.nextInt(1000)));
+		EntityOtherPlayerMP fake = new EntityOtherPlayerMP(this, player.getGameProfile());
 		fake.setPosition(player.posX + this.rand.nextInt(12) - 6.0D, player.posY, player.posZ + this.rand.nextInt(12) - 6.0D);
-		fake.setPositionAndRotation(fake.posX, fake.posY, fake.posZ, this.rand.nextFloat() * 360.0F, 0.0F);
+		fake.setCustomNameTag("Dreamer");
+		fake.setAlwaysRenderNameTag(true);
+		fake.setHealth(20.0F);
+		fake.setNoAI(false);
 		this.spawnEntityInWorld(fake);
+		this.dreamEntityIds.add(fake.getEntityId());
 	}
 
-	private void generateDreamStructureNear(BlockPos pos) {
-		if (this.rand.nextInt(3) != 0) {
+	private void rewriteDreamVicinity(EntityPlayer player) {
+		if (player == null) {
 			return;
 		}
-		int baseX = pos.getX() + this.rand.nextInt(24) - 12;
-		int baseZ = pos.getZ() + this.rand.nextInt(24) - 12;
-		int baseY = this.getTopSolidOrLiquidBlock(new BlockPos(baseX, 0, baseZ)).getY();
-		for (int x = 0; x < 5; ++x) {
-			for (int z = 0; z < 5; ++z) {
-				for (int y = 0; y < 4; ++y) {
-					BlockPos blockPos = new BlockPos(baseX + x - 2, baseY + y, baseZ + z - 2);
-					if (this.rand.nextInt(8) == 0) {
-						this.setBlockState(blockPos, Blocks.stained_hardened_clay.getDefaultState());
-					} else if (this.rand.nextInt(7) == 0) {
-						this.setBlockState(blockPos, Blocks.obsidian.getDefaultState());
+		BlockPos origin = player.getPosition();
+		int radius = 80;
+		int baseY = Math.max(70, this.getTopSolidOrLiquidBlock(new BlockPos(origin.getX(), 0, origin.getZ())).getY() + 8);
+		for (int x = origin.getX() - radius; x <= origin.getX() + radius; ++x) {
+			for (int z = origin.getZ() - radius; z <= origin.getZ() + radius; ++z) {
+				int dx = x - origin.getX();
+				int dz = z - origin.getZ();
+				boolean gridLine = Math.abs(dx) % 8 == 0 || Math.abs(dz) % 8 == 0;
+				this.setBlockState(new BlockPos(x, baseY, z), gridLine ? Blocks.glowstone.getDefaultState() : Blocks.stained_hardened_clay.getDefaultState());
+				for (int y = baseY + 1; y <= baseY + 10; ++y) {
+					if (((x + z + y) % 7) == 0) {
+						this.setBlockState(new BlockPos(x, y, z), Blocks.obsidian.getDefaultState());
+					} else {
+						this.setBlockState(new BlockPos(x, y, z), Blocks.air.getDefaultState());
 					}
 				}
 			}
 		}
+		player.setPosition((double) origin.getX() + 0.5D, (double) (baseY + 12), (double) origin.getZ() + 0.5D);
+	}
+
+	private void spawnEmptyDreamVillage(EntityPlayer player) {
+		if (player == null || this.rand.nextInt(3) != 0) {
+			return;
+		}
+		BlockPos origin = player.getPosition();
+		for (int i = 0; i < 2; ++i) {
+			int baseX = origin.getX() + this.rand.nextInt(48) - 24;
+			int baseZ = origin.getZ() + this.rand.nextInt(48) - 24;
+			int baseY = Math.max(70, this.getTopSolidOrLiquidBlock(new BlockPos(baseX, 0, baseZ)).getY() + 1);
+			for (int x = 0; x < 4; ++x) {
+				for (int z = 0; z < 4; ++z) {
+					for (int y = 0; y < 3; ++y) {
+						if (x == 0 || x == 3 || z == 0 || z == 3 || y == 2) {
+							this.setBlockState(new BlockPos(baseX + x - 1, baseY + y, baseZ + z - 1), Blocks.cobblestone.getDefaultState());
+						}
+					}
+				}
+			}
+		}
+	}
+
+	private void teleportToFarlands(EntityPlayer player) {
+		if (player == null) {
+			return;
+		}
+		int signX = this.rand.nextBoolean() ? 1 : -1;
+		int signZ = this.rand.nextBoolean() ? 1 : -1;
+		int farX = signX * (30000000 + this.rand.nextInt(1000000));
+		int farZ = signZ * (30000000 + this.rand.nextInt(1000000));
+		player.setPositionAndRotation((double) farX, 140.0D, (double) farZ, 0.0F, 0.0F);
+		this.sendDreamLoreMessage(player, "<Far Lands> the horizon is wrong and the sky keeps folding.");
 	}
 
 	public Block getGroundAboveSeaLevel(BlockPos pos) {
