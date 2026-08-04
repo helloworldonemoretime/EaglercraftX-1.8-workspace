@@ -396,7 +396,7 @@ public abstract class World implements IBlockAccess {
 			dreamer.setCustomNameTag(this.rand.nextBoolean() ? "Dream Witness" : "Shadow Caller");
 			dreamer.setAlwaysRenderNameTag(true);
 			dreamer.setHealth(20.0F);
-			dreamer.setNoAI(false);
+			dreamer.setAIMoveSpeed(0.25F);
 			this.spawnEntityInWorld(dreamer);
 			this.dreamEntityIds.add(dreamer.getEntityId());
 		}
@@ -428,7 +428,7 @@ public abstract class World implements IBlockAccess {
 		fake.setCustomNameTag("Dreamer");
 		fake.setAlwaysRenderNameTag(true);
 		fake.setHealth(20.0F);
-		fake.setNoAI(false);
+		fake.setAIMoveSpeed(0.25F);
 		this.spawnEntityInWorld(fake);
 		this.dreamEntityIds.add(fake.getEntityId());
 	}
